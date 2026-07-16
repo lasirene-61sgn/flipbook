@@ -376,7 +376,8 @@ async function calcSize() {
 function renderPage(n) {
     if(done.has(n)) return Promise.resolve();
     if(fly.has(n))  return fly.get(n);
-    var cont=isMobile ? mStrip.children[n-1] : flipEl.children[n-1];
+    var sel = isMobile ? '.mobile-page[data-page-index="'+n+'"]' : '.page-container[data-page-index="'+n+'"]';
+    var cont = document.querySelector(sel);
     if(!cont) return Promise.resolve();
     var p=(async function(){
         try {
@@ -475,13 +476,15 @@ async function initMobile(sz) {
     mStrip.innerHTML='';
     for(var i=1;i<=totalPages;i++){
         var sl=document.createElement('div'); sl.className='mobile-page';
+        sl.dataset.pageIndex = i;
         sl.style.width=sz.width+'px'; sl.style.height=sz.height+'px';
         sl.innerHTML='<div class="skeleton-loader"><span style="color:#475569;font-size:11px">Page '+i+'</span></div>';
         mStrip.appendChild(sl);
     }
-    for(var i=1;i<=totalPages;i++){
-        loadTxt.textContent='Rendering page '+i+' of '+totalPages+'...';
-        await renderPage(i); setProgress(42+(i/totalPages)*53);
+    loadTxt.textContent='Rendering cover...';
+    var initPages = Math.min(1, totalPages);
+    for(var i=1;i<=initPages;i++){
+        await renderPage(i); setProgress(42+(i/initPages)*53);
     }
     setProgress(98); loadTxt.textContent='Opening flipbook...';
     mStrip.style.display='block';
@@ -496,7 +499,23 @@ async function initMobile(sz) {
     setTimeout(function(){loadOv.classList.add('hidden');},300);
     setPgIndicator(1);
     
-    pageFlip.on('flip',function(e){playFlip();setPgIndicator(e.data+1);mIdx=e.data;updateMPill();});
+    pageFlip.on('flip',function(e){
+        playFlip();setPgIndicator(e.data+1);mIdx=e.data;updateMPill();
+        var p = e.data + 1;
+        renderPage(p);
+        if(p+1 <= totalPages) renderPage(p+1);
+        if(p+2 <= totalPages) renderPage(p+2);
+        if(p-1 >= 1) renderPage(p-1);
+    });
+
+    setTimeout(async function() {
+        for(var i=1;i<=totalPages;i++){
+            if(!done.has(i)) {
+                await renderPage(i);
+                await new Promise(r => setTimeout(r, 50));
+            }
+        }
+    }, 1000);
 
     document.getElementById('m-prev').addEventListener('click',function(){pageFlip.flipPrev();});
     document.getElementById('m-next').addEventListener('click',function(){pageFlip.flipNext();});
@@ -508,13 +527,15 @@ async function initDesktop(sz) {
     flipEl.innerHTML='';
     for(var i=1;i<=totalPages;i++){
         var d=document.createElement('div'); d.className='page-container';
+        d.dataset.pageIndex = i;
         d.style.width=sz.width+'px'; d.style.height=sz.height+'px';
         d.innerHTML='<div class="skeleton-loader"><span style="color:#94a3b8;font-size:11px">Page '+i+'</span></div>';
         flipEl.appendChild(d);
     }
-    for(var i=1;i<=totalPages;i++){
-        loadTxt.textContent='Rendering page '+i+' of '+totalPages+'...';
-        await renderPage(i); setProgress(42+(i/totalPages)*53);
+    loadTxt.textContent='Rendering cover...';
+    var initPages = Math.min(2, totalPages); // 2 pages for desktop to show front cover and inside cover if they open it instantly
+    for(var i=1;i<=initPages;i++){
+        await renderPage(i); setProgress(42+(i/initPages)*53);
     }
     setProgress(98); loadTxt.textContent='Opening flipbook...';
 
@@ -529,7 +550,25 @@ async function initDesktop(sz) {
     setTimeout(function(){loadOv.classList.add('hidden');},400);
     setPgIndicator(1);
 
-    pageFlip.on('flip',function(e){playFlip();setPgIndicator(e.data+1);syncThumb(e.data+1);});
+    pageFlip.on('flip',function(e){
+        playFlip();setPgIndicator(e.data+1);syncThumb(e.data+1);
+        var p = e.data + 1;
+        renderPage(p);
+        if(p+1 <= totalPages) renderPage(p+1);
+        if(p+2 <= totalPages) renderPage(p+2);
+        if(p+3 <= totalPages) renderPage(p+3);
+        if(p-1 >= 1) renderPage(p-1);
+        if(p-2 >= 1) renderPage(p-2);
+    });
+
+    setTimeout(async function() {
+        for(var i=1;i<=totalPages;i++){
+            if(!done.has(i)) {
+                await renderPage(i);
+                await new Promise(r => setTimeout(r, 50));
+            }
+        }
+    }, 1000);
 
     document.getElementById('btn-prev').addEventListener('click',function(){pageFlip.flipPrev();});
     document.getElementById('btn-next').addEventListener('click',function(){pageFlip.flipNext();});
