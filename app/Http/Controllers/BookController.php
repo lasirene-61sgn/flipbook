@@ -54,7 +54,7 @@ class BookController extends Controller
         fclose($out);
 
         if ($chunkIndex === $totalChunks - 1) {
-            $finalPath = public_path('pdfs');
+            $finalPath = storage_path('app/public/pdfs');
             if (!File::exists($finalPath)) {
                 File::makeDirectory($finalPath, 0755, true, true);
             }
@@ -73,7 +73,7 @@ class BookController extends Controller
             
             // Generate Images using Ghostscript
             $folderName = uniqid() . '_' . pathinfo($cleanName, PATHINFO_FILENAME);
-            $imagesDir = public_path('books/' . $folderName);
+            $imagesDir = storage_path('app/public/books/' . $folderName);
             if (!File::exists($imagesDir)) {
                 File::makeDirectory($imagesDir, 0755, true, true);
             }
@@ -121,7 +121,7 @@ class BookController extends Controller
         
         $cleanName = 'bulk_images_' . time();
         $folderName = uniqid() . '_' . $cleanName;
-        $imagesDir = public_path('books/' . $folderName);
+        $imagesDir = storage_path('app/public/books/' . $folderName);
         
         if (!File::exists($imagesDir)) {
             File::makeDirectory($imagesDir, 0755, true, true);
@@ -187,7 +187,7 @@ class BookController extends Controller
             ]);
         }
 
-        $filePath = public_path($book->pdf_path);
+        $filePath = storage_path('app/public/' . $book->pdf_path);
 
         if (!file_exists($filePath)) {
             abort(404, 'PDF file not found.');
@@ -267,7 +267,7 @@ class BookController extends Controller
     {
         return response()->json([
             'title' => $book->title,
-            'path' => asset($book->pdf_path),
+            'path' => asset('storage/' . $book->pdf_path),
             'stream_url' => route('books.stream', $book->id)
         ]);
     }

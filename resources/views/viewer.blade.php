@@ -301,7 +301,7 @@ const isMobile  = window.innerWidth < 768;
 
 const bookHasImages = {{ !empty($book->folder_path) ? 'true' : 'false' }};
 const bookPageCount = {{ $book->page_count ?? 0 }};
-const bookFolderPath = '{{ !empty($book->folder_path) ? asset($book->folder_path) : '' }}';
+const bookFolderPath = '{{ !empty($book->folder_path) ? asset('storage/' . $book->folder_path) : '' }}';
 
 let pdfDoc=null, pageFlip=null, totalPages=0;
 let currentZoom=1, baseW=0, baseH=0, mIdx=0;
