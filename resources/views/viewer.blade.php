@@ -299,6 +299,10 @@ const bookId    = {{ $book->id }};
 const streamUrl = window.location.origin + '/book/' + bookId + '/stream';
 const isMobile  = window.innerWidth < 768;
 
+const bookHasImages = {{ !empty($book->folder_path) ? 'true' : 'false' }};
+const bookPageCount = {{ $book->page_count ?? 0 }};
+const bookFolderPath = '{{ !empty($book->folder_path) ? asset($book->folder_path) : '' }}';
+
 let pdfDoc=null, pageFlip=null, totalPages=0;
 let currentZoom=1, baseW=0, baseH=0, mIdx=0;
 let autoTimer=null, autoOn=false, thumbsDone=false;
@@ -359,6 +363,26 @@ function playFlip() {
 
 /* Page size */
 async function calcSize() {
+    if(bookHasImages) {
+        return new Promise(resolve => {
+            var img = new Image();
+            img.onload = function() {
+                var vp = {width: img.width, height: img.height};
+                if(isMobile) {
+                    var ah=window.innerHeight-110,aw=window.innerWidth-8;
+                    var s=Math.min(ah/vp.height,aw/vp.width);
+                    baseW=Math.floor(vp.width*s); baseH=Math.floor(vp.height*s);
+                } else {
+                    var ah2=window.innerHeight-100,aw2=window.innerWidth-160;
+                    var s2=Math.min(ah2/vp.height,(aw2/2)/vp.width);
+                    baseW=Math.floor(vp.width*s2); baseH=Math.floor(vp.height*s2);
+                }
+                resolve({width:baseW,height:baseH});
+            };
+            img.src = bookFolderPath + '/page_1.jpg';
+        });
+    }
+
     var page=await pdfDoc.getPage(1), vp=page.getViewport({scale:1});
     if(isMobile) {
         var ah=window.innerHeight-110,aw=window.innerWidth-8;
@@ -379,6 +403,26 @@ function renderPage(n) {
     var sel = isMobile ? '.mobile-page[data-page-index="'+n+'"]' : '.page-container[data-page-index="'+n+'"]';
     var cont = document.querySelector(sel);
     if(!cont) return Promise.resolve();
+
+    if (bookHasImages) {
+        var p = new Promise(resolve => {
+            var img = new Image();
+            img.style.width=baseW+'px'; img.style.height=baseH+'px';
+            img.style.display='block';
+            img.onload = function() {
+                cont.innerHTML=''; cont.appendChild(img);
+                done.add(n); updateMPill();
+                resolve();
+            };
+            img.onerror = function() {
+                cont.innerHTML='<div class="skeleton-loader"><span style="color:#f87171;font-size:11px">Page '+n+' failed</span></div>';
+                resolve();
+            };
+            img.src = bookFolderPath + '/page_' + n + '.jpg';
+        });
+        fly.set(n,p); return p;
+    }
+
     var p=(async function(){
         try {
             var page=await pdfDoc.getPage(n);
@@ -406,6 +450,17 @@ function renderPage(n) {
 
 /* Thumbnails */
 async function renderThumb(n) {
+    if (bookHasImages) {
+        return new Promise(resolve => {
+            var img = new Image();
+            img.style.width='100%'; img.style.height='100%';
+            img.style.objectFit='cover'; img.style.borderRadius='2px';
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(document.createElement('canvas')); // fallback
+            img.src = bookFolderPath + '/page_' + n + '.jpg';
+        });
+    }
+
     var page=await pdfDoc.getPage(n), vp=page.getViewport({scale:1});
     var sc=80/vp.height, vp2=page.getViewport({scale:sc});
     var c=document.createElement('canvas');
@@ -595,6 +650,16 @@ async function init() {
     try {
         loadTxt.textContent='Connecting to stream...';
         retryBtn.style.display='none';
+
+        if (bookHasImages) {
+            totalPages = bookPageCount;
+            setProgress(42);
+            loadTxt.textContent='Calculating layout...';
+            var sz=await calcSize();
+            if(isMobile) await initMobile(sz);
+            else await initDesktop(sz);
+            return;
+        }
 
         // Verify the stream URL is reachable before giving it to pdf.js
         loadTxt.textContent='Loading PDF from: ' + streamUrl.replace(window.location.origin,'');

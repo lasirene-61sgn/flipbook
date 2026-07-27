@@ -26,9 +26,16 @@
         <div class="md:col-span-1 space-y-6">
             <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
                 <h2 class="text-xl font-bold mb-1 text-slate-100">Add New Flipbook</h2>
-                <p class="text-xs text-slate-400 mb-6">Upload high-resolution PDFs using managed chunking</p>
+                <p class="text-xs text-slate-400 mb-4">Upload a high-resolution PDF or bulk images to create your flipbook</p>
+                
+                <!-- Tabs -->
+                <div class="flex border-b border-slate-800 mb-6">
+                    <button type="button" id="tab-pdf" class="px-4 py-2 text-sm font-medium text-indigo-400 border-b-2 border-indigo-400">PDF Upload</button>
+                    <button type="button" id="tab-images" class="px-4 py-2 text-sm font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-300">Bulk Images</button>
+                </div>
 
-                <form id="upload-form" class="space-y-4">
+                <!-- PDF Form -->
+                <form id="upload-form" class="space-y-4 block">
                     @csrf
                     <div>
                         <label for="book-title" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Book Custom Title (Optional)</label>
@@ -76,7 +83,60 @@
                     </div>
 
                     <button type="submit" id="btn-submit" disabled class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-800 disabled:text-slate-500 text-white font-medium py-3 rounded-xl shadow-lg transition duration-150 flex items-center justify-center gap-2">
-                        <span>Compile & Upload</span>
+                        <span>Compile & Upload PDF</span>
+                    </button>
+                </form>
+
+                <!-- Images Form -->
+                <form id="upload-images-form" class="space-y-4 hidden">
+                    @csrf
+                    <div>
+                        <label for="book-title-images" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Book Custom Title (Optional)</label>
+                        <input type="text" id="book-title-images" name="title" placeholder="Enter flipbook title"
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors">
+                    </div>
+
+                    <!-- Drag & Drop Zone Images -->
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Select Bulk Images</label>
+                        <div id="drop-zone-images" class="border-2 border-dashed border-slate-800 hover:border-indigo-500/60 transition-colors rounded-2xl p-6 text-center cursor-pointer bg-slate-950/40 relative group">
+                            <input type="file" id="images-file" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                            <div class="space-y-3">
+                                <div class="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center mx-auto text-slate-400 group-hover:text-indigo-400 transition-colors">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                </div>
+                                <div class="text-sm">
+                                    <span class="font-medium text-indigo-400">Click to select images</span> or drag and drop
+                                </div>
+                                <p class="text-xs text-slate-500">Multiple JPG/PNG files supported</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Selected Files Info -->
+                    <div id="images-info" class="hidden bg-slate-950 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+                        <div class="truncate mr-3">
+                            <p id="images-name" class="text-sm font-medium text-slate-200 truncate">0 images selected</p>
+                            <p id="images-size" class="text-xs text-slate-500">0.0 MB</p>
+                        </div>
+                        <button type="button" id="btn-remove-images" class="text-slate-500 hover:text-red-400 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Uploading Progress State -->
+                    <div id="progress-container-images" class="hidden space-y-2">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <span id="progress-status-images" class="text-indigo-400">Uploading Images...</span>
+                            <span id="progress-percent-images" class="text-slate-400">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                            <div id="progress-bar-images" class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 w-0 transition-[width] duration-150"></div>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-submit-images" disabled class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-800 disabled:text-slate-500 text-white font-medium py-3 rounded-xl shadow-lg transition duration-150 flex items-center justify-center gap-2">
+                        <span>Upload Images</span>
                     </button>
                 </form>
             </div>
@@ -136,8 +196,44 @@
         const progressStatus = document.getElementById('progress-status');
         const progressPercent = document.getElementById('progress-percent');
 
+        // Images elements
+        const tabPdf = document.getElementById('tab-pdf');
+        const tabImages = document.getElementById('tab-images');
+        const uploadImagesForm = document.getElementById('upload-images-form');
+        const dropZoneImages = document.getElementById('drop-zone-images');
+        const imagesFile = document.getElementById('images-file');
+        const imagesInfo = document.getElementById('images-info');
+        const imagesName = document.getElementById('images-name');
+        const imagesSize = document.getElementById('images-size');
+        const btnRemoveImages = document.getElementById('btn-remove-images');
+        const btnSubmitImages = document.getElementById('btn-submit-images');
+        const progressContainerImages = document.getElementById('progress-container-images');
+        const progressBarImages = document.getElementById('progress-bar-images');
+        const progressStatusImages = document.getElementById('progress-status-images');
+        const progressPercentImages = document.getElementById('progress-percent-images');
+
         let activeFile = null;
+        let activeImages = [];
         const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB chunks
+
+        // Tab Switching
+        tabPdf.addEventListener('click', () => {
+            tabPdf.classList.replace('text-slate-400', 'text-indigo-400');
+            tabPdf.classList.replace('border-transparent', 'border-indigo-400');
+            tabImages.classList.replace('text-indigo-400', 'text-slate-400');
+            tabImages.classList.replace('border-indigo-400', 'border-transparent');
+            uploadForm.classList.replace('hidden', 'block');
+            uploadImagesForm.classList.replace('block', 'hidden');
+        });
+
+        tabImages.addEventListener('click', () => {
+            tabImages.classList.replace('text-slate-400', 'text-indigo-400');
+            tabImages.classList.replace('border-transparent', 'border-indigo-400');
+            tabPdf.classList.replace('text-indigo-400', 'text-slate-400');
+            tabPdf.classList.replace('border-indigo-400', 'border-transparent');
+            uploadImagesForm.classList.replace('hidden', 'block');
+            uploadForm.classList.replace('block', 'hidden');
+        });
 
         // Handle File Dragging UI states
         ['dragenter', 'dragover'].forEach(event => {
@@ -145,12 +241,20 @@
                 e.preventDefault();
                 dropZone.classList.add('border-indigo-500', 'bg-indigo-500/5');
             });
+            dropZoneImages.addEventListener(event, (e) => {
+                e.preventDefault();
+                dropZoneImages.classList.add('border-indigo-500', 'bg-indigo-500/5');
+            });
         });
 
         ['dragleave', 'drop'].forEach(event => {
             dropZone.addEventListener(event, (e) => {
                 e.preventDefault();
                 dropZone.classList.remove('border-indigo-500', 'bg-indigo-500/5');
+            });
+            dropZoneImages.addEventListener(event, (e) => {
+                e.preventDefault();
+                dropZoneImages.classList.remove('border-indigo-500', 'bg-indigo-500/5');
             });
         });
 
@@ -186,7 +290,40 @@
             btnSubmit.setAttribute('disabled', 'true');
         });
 
-        // Form Submit for Chunking
+        // Track selected images
+        imagesFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleImagesSelection(e.target.files);
+            }
+        });
+
+        dropZoneImages.addEventListener('drop', (e) => {
+            if (e.dataTransfer.files.length > 0) {
+                handleImagesSelection(e.dataTransfer.files);
+            }
+        });
+
+        function handleImagesSelection(files) {
+            activeImages = Array.from(files).filter(file => file.type.startsWith('image/'));
+            if (activeImages.length === 0) {
+                alert('Please select valid image files.');
+                return;
+            }
+            let totalSize = activeImages.reduce((sum, file) => sum + file.size, 0);
+            imagesName.textContent = `${activeImages.length} images selected`;
+            imagesSize.textContent = `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+            imagesInfo.classList.remove('hidden');
+            btnSubmitImages.removeAttribute('disabled');
+        }
+
+        btnRemoveImages.addEventListener('click', () => {
+            activeImages = [];
+            imagesFile.value = '';
+            imagesInfo.classList.add('hidden');
+            btnSubmitImages.setAttribute('disabled', 'true');
+        });
+
+        // Form Submit for PDF Chunking
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!activeFile) return;
@@ -242,6 +379,68 @@
                     return;
                 }
             }
+        });
+
+        // Form Submit for Bulk Images
+        uploadImagesForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (activeImages.length === 0) return;
+
+            btnSubmitImages.setAttribute('disabled', 'true');
+            progressContainerImages.classList.remove('hidden');
+
+            const customTitle = document.getElementById('book-title-images').value;
+            
+            const formData = new FormData();
+            formData.append('_token', '{{ csrf_token() }}');
+            if (customTitle) formData.append('title', customTitle);
+            
+            activeImages.forEach((image) => {
+                formData.append('images[]', image);
+            });
+
+            progressStatusImages.textContent = 'Uploading...';
+            progressBarImages.style.width = '10%';
+            progressPercentImages.textContent = '10%';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', "{{ route('books.storeImages') }}", true);
+
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percentComplete = Math.round((e.loaded / e.total) * 100);
+                    progressBarImages.style.width = `${percentComplete}%`;
+                    progressPercentImages.textContent = `${percentComplete}%`;
+                    if (percentComplete === 100) {
+                        progressStatusImages.textContent = 'Compiling elements...';
+                    }
+                }
+            };
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const result = JSON.parse(xhr.responseText);
+                    if (result.success && result.redirect) {
+                        window.location.href = result.redirect;
+                    } else {
+                        alert(`Upload Error: ${result.message || 'Failed'}`);
+                        btnSubmitImages.removeAttribute('disabled');
+                        progressContainerImages.classList.add('hidden');
+                    }
+                } else {
+                    alert('Upload Failed with status: ' + xhr.status);
+                    btnSubmitImages.removeAttribute('disabled');
+                    progressContainerImages.classList.add('hidden');
+                }
+            };
+
+            xhr.onerror = function() {
+                alert('An error occurred during the upload');
+                btnSubmitImages.removeAttribute('disabled');
+                progressContainerImages.classList.add('hidden');
+            };
+
+            xhr.send(formData);
         });
     </script>
 </body>

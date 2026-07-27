@@ -70,10 +70,30 @@ class BookController extends Controller
             }
 
             $dbPath = 'pdfs/' . $cleanName;
+            
+            // Generate Images using Ghostscript
+            $folderName = uniqid() . '_' . pathinfo($cleanName, PATHINFO_FILENAME);
+            $imagesDir = public_path('books/' . $folderName);
+            if (!File::exists($imagesDir)) {
+                File::makeDirectory($imagesDir, 0755, true, true);
+            }
+            
+            $gsPath = '"C:\Program Files\gs\gs10.03.1\bin\gswin64c.exe"';
+            $outputPattern = $imagesDir . '/page_%d.jpg';
+            
+            // Convert PDF to JPGs
+            $cmd = "$gsPath -dSAFER -dBATCH -dNOPAUSE -sDEVICE=jpeg -r120 -dTextAlphaBits=4 -dGraphicsAlphaBits=4 -sOutputFile=\"$outputPattern\" \"$destination\"";
+            shell_exec($cmd);
+            
+            // Get total page count by counting generated images
+            $files = glob($imagesDir . '/page_*.jpg');
+            $pageCount = count($files);
 
             Book::create([
                 'title' => $request->title ?? pathinfo($cleanName, PATHINFO_FILENAME),
                 'pdf_path' => $dbPath,
+                'page_count' => $pageCount > 0 ? $pageCount : null,
+                'folder_path' => $pageCount > 0 ? 'books/' . $folderName : null,
             ]);
 
             return response()->json([
@@ -86,6 +106,65 @@ class BookController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Chunk processed successfully.'
+        ]);
+    }
+
+    public function storeImages(Request $request)
+    {
+        $request->validate([
+            'title' => 'nullable|string|max:255',
+            'images' => 'required|array',
+            'images.*' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // max 5MB per image
+        ]);
+
+        $images = $request->file('images');
+        
+        $cleanName = 'bulk_images_' . time();
+        $folderName = uniqid() . '_' . $cleanName;
+        $imagesDir = public_path('books/' . $folderName);
+        
+        if (!File::exists($imagesDir)) {
+            File::makeDirectory($imagesDir, 0755, true, true);
+        }
+
+        $pageCount = 0;
+        foreach ($images as $index => $image) {
+            $pageCount++;
+            $fileName = 'page_' . $pageCount . '.jpg';
+            
+            // Convert image to JPG to match frontend expectations
+            $imgStr = file_get_contents($image->getPathname());
+            $gdImage = @imagecreatefromstring($imgStr);
+            
+            if ($gdImage !== false) {
+                // Create a white background canvas in case it's a transparent PNG/GIF
+                $bg = imagecreatetruecolor(imagesx($gdImage), imagesy($gdImage));
+                $white = imagecolorallocate($bg, 255, 255, 255);
+                imagefill($bg, 0, 0, $white);
+                imagecopy($bg, $gdImage, 0, 0, 0, 0, imagesx($gdImage), imagesy($gdImage));
+                
+                // Save as JPG
+                imagejpeg($bg, $imagesDir . '/' . $fileName, 90);
+                
+                imagedestroy($gdImage);
+                imagedestroy($bg);
+            } else {
+                // Fallback: just move and rename to .jpg
+                $image->move($imagesDir, $fileName);
+            }
+        }
+
+        Book::create([
+            'title' => $request->title ?? 'Bulk Images Flipbook',
+            'pdf_path' => 'images_only',
+            'page_count' => $pageCount > 0 ? $pageCount : null,
+            'folder_path' => $pageCount > 0 ? 'books/' . $folderName : null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Images uploaded and flipbook compiled successfully!',
+            'redirect' => route('books.index')
         ]);
     }
 
