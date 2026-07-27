@@ -405,6 +405,7 @@
 
             const xhr = new XMLHttpRequest();
             xhr.open('POST', "{{ route('books.storeImages') }}", true);
+            xhr.setRequestHeader('Accept', 'application/json');
 
             xhr.upload.onprogress = function(e) {
                 if (e.lengthComputable) {
@@ -428,7 +429,16 @@
                         progressContainerImages.classList.add('hidden');
                     }
                 } else {
-                    alert('Upload Failed with status: ' + xhr.status);
+                    let errMsg = 'Upload Failed with status: ' + xhr.status;
+                    try {
+                        const errResult = JSON.parse(xhr.responseText);
+                        errMsg = errResult.message || errMsg;
+                        if (errResult.errors) {
+                            errMsg += '\n' + Object.values(errResult.errors).flat().join('\n');
+                        }
+                    } catch(e) {}
+                    
+                    alert(errMsg);
                     btnSubmitImages.removeAttribute('disabled');
                     progressContainerImages.classList.add('hidden');
                 }

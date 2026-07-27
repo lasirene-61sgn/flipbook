@@ -111,61 +111,68 @@ class BookController extends Controller
 
     public function storeImages(Request $request)
     {
-        $request->validate([
-            'title' => 'nullable|string|max:255',
-            'images' => 'required|array',
-            'images.*' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // max 5MB per image
-        ]);
+        try {
+            $request->validate([
+                'title' => 'nullable|string|max:255',
+                'images' => 'required|array',
+                'images.*' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // max 5MB per image
+            ]);
 
-        $images = $request->file('images');
-        
-        $cleanName = 'bulk_images_' . time();
-        $folderName = uniqid() . '_' . $cleanName;
-        $imagesDir = storage_path('app/public/books/' . $folderName);
-        
-        if (!File::exists($imagesDir)) {
-            File::makeDirectory($imagesDir, 0755, true, true);
-        }
-
-        $pageCount = 0;
-        foreach ($images as $index => $image) {
-            $pageCount++;
-            $fileName = 'page_' . $pageCount . '.jpg';
+            $images = $request->file('images');
             
-            // Convert image to JPG to match frontend expectations
-            $imgStr = file_get_contents($image->getPathname());
-            $gdImage = @imagecreatefromstring($imgStr);
+            $cleanName = 'bulk_images_' . time();
+            $folderName = uniqid() . '_' . $cleanName;
+            $imagesDir = storage_path('app/public/books/' . $folderName);
             
-            if ($gdImage !== false) {
-                // Create a white background canvas in case it's a transparent PNG/GIF
-                $bg = imagecreatetruecolor(imagesx($gdImage), imagesy($gdImage));
-                $white = imagecolorallocate($bg, 255, 255, 255);
-                imagefill($bg, 0, 0, $white);
-                imagecopy($bg, $gdImage, 0, 0, 0, 0, imagesx($gdImage), imagesy($gdImage));
-                
-                // Save as JPG
-                imagejpeg($bg, $imagesDir . '/' . $fileName, 90);
-                
-                imagedestroy($gdImage);
-                imagedestroy($bg);
-            } else {
-                // Fallback: just move and rename to .jpg
-                $image->move($imagesDir, $fileName);
+            if (!File::exists($imagesDir)) {
+                File::makeDirectory($imagesDir, 0755, true, true);
             }
+
+            $pageCount = 0;
+            foreach ($images as $index => $image) {
+                $pageCount++;
+                $fileName = 'page_' . $pageCount . '.jpg';
+                
+                // Convert image to JPG to match frontend expectations
+                $imgStr = file_get_contents($image->getPathname());
+                $gdImage = @imagecreatefromstring($imgStr);
+                
+                if ($gdImage !== false) {
+                    // Create a white background canvas in case it's a transparent PNG/GIF
+                    $bg = imagecreatetruecolor(imagesx($gdImage), imagesy($gdImage));
+                    $white = imagecolorallocate($bg, 255, 255, 255);
+                    imagefill($bg, 0, 0, $white);
+                    imagecopy($bg, $gdImage, 0, 0, 0, 0, imagesx($gdImage), imagesy($gdImage));
+                    
+                    // Save as JPG
+                    imagejpeg($bg, $imagesDir . '/' . $fileName, 90);
+                    
+                    imagedestroy($gdImage);
+                    imagedestroy($bg);
+                } else {
+                    // Fallback: just move and rename to .jpg
+                    $image->move($imagesDir, $fileName);
+                }
+            }
+
+            Book::create([
+                'title' => $request->title ?? 'Bulk Images Flipbook',
+                'pdf_path' => 'images_only',
+                'page_count' => $pageCount > 0 ? $pageCount : null,
+                'folder_path' => $pageCount > 0 ? 'books/' . $folderName : null,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Images uploaded and flipbook compiled successfully!',
+                'redirect' => route('books.index')
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Server Error: ' . $e->getMessage() . ' (Line: ' . $e->getLine() . ')'
+            ], 500);
         }
-
-        Book::create([
-            'title' => $request->title ?? 'Bulk Images Flipbook',
-            'pdf_path' => 'images_only',
-            'page_count' => $pageCount > 0 ? $pageCount : null,
-            'folder_path' => $pageCount > 0 ? 'books/' . $folderName : null,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Images uploaded and flipbook compiled successfully!',
-            'redirect' => route('books.index')
-        ]);
     }
 
     public function show(Book $book)
